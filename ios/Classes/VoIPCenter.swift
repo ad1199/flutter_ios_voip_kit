@@ -21,11 +21,13 @@ class VoIPCenter: NSObject {
 
     // MARK: - event channel
 
+    private let bgMethodChannel: FlutterMethodChannel
     private let eventChannel: FlutterEventChannel
     private var eventSink: FlutterEventSink?
 
     private enum EventChannel: String {
         case onDidReceiveIncomingPush
+        case onDidReceiveIncomingBackgroundPush
         case onDidAcceptIncomingCall
         case onDidRejectIncomingCall
         
@@ -63,7 +65,8 @@ class VoIPCenter: NSObject {
     fileprivate let ioBufferDuration: TimeInterval
     fileprivate let audioSampleRate: Double
 
-    init(eventChannel: FlutterEventChannel) {
+    init(bgMethodChannel: FlutterMethodChannel, eventChannel: FlutterEventChannel) {
+        self.bgMethodChannel = bgMethodChannel
         self.eventChannel = eventChannel
         self.pushRegistry = PKPushRegistry(queue: .main)
         self.pushRegistry.desiredPushTypes = [.voIP]
@@ -103,20 +106,39 @@ extension VoIPCenter: PKPushRegistryDelegate {
     public func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType, completion: @escaping () -> Void) {
         print("🎈 VoIP didReceiveIncomingPushWith completion: \(payload.dictionaryPayload)")
 
+        let app = UIApplication.shared;
         let info = self.parse(payload: payload)
-        let callerName = info?["incoming_caller_name"] as! String
-        self.callKitCenter.incomingCall(uuidString: info?["uuid"] as! String,
-                                        callerId: info?["incoming_caller_id"] as! String,
-                                        callerName: callerName) { error in
-            if let error = error {
-                print("❌ reportNewIncomingCall error: \(error.localizedDescription)")
-                return
-            }
+        //let callerName = info?["incoming_caller_name"] as! String
+        // self.callKitCenter.incomingCall(uuidString: info?["uuid"] as! String,
+        //                                 callerId: info?["incoming_caller_id"] as! String,
+        //                                 callerName: callerName) { error in
+        //     if let error = error {
+        //         print("❌ reportNewIncomingCall error: \(error.localizedDescription)")
+        //         return
+        //     }
+        //     self.eventSink?(["event": EventChannel.onDidReceiveIncomingPush.rawValue,
+        //                      "payload": info as Any,
+        //                      "incoming_caller_name": callerName])
+        //     completion()
+        // }
+
+        let defaults = UserDefaults.standard
+        let callbackHandle = defaults.integer(forKey: "voip_on_background_incoming_push_handle");
+        print("[Voip kit : callback handler]");
+        print(callbackHandle);
+
+        if(app.applicationState == UIApplication.State.active) {
+            print("VOIP : App in foreground")
             self.eventSink?(["event": EventChannel.onDidReceiveIncomingPush.rawValue,
-                             "payload": info as Any,
-                             "incoming_caller_name": callerName])
-            completion()
+                             "payload": info as Any])
+            self.bgMethodChannel.invokeMethod("run", arguments: callbackHandle)
+        } else {
+            print("VOIP : App is in the background")
+            self.eventSink?(["event": EventChannel.onDidReceiveIncomingBackgroundPush.rawValue,
+                             "payload": info as Any])
         }
+
+        completion()
     }
 
     // NOTE: iOS10 support
@@ -124,18 +146,29 @@ extension VoIPCenter: PKPushRegistryDelegate {
     public func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType) {
         print("🎈 VoIP didReceiveIncomingPushWith: \(payload.dictionaryPayload)")
 
+        let app = UIApplication.shared;
         let info = self.parse(payload: payload)
-        let callerName = info?["incoming_caller_name"] as! String
-        self.callKitCenter.incomingCall(uuidString: info?["uuid"] as! String,
-                                        callerId: info?["incoming_caller_id"] as! String,
-                                        callerName: callerName) { error in
-            if let error = error {
-                print("❌ reportNewIncomingCall error: \(error.localizedDescription)")
-                return
-            }
+        //let callerName = info?["incoming_caller_name"] as! String
+        // self.callKitCenter.incomingCall(uuidString: info?["uuid"] as! String,
+        //                                 callerId: info?["incoming_caller_id"] as! String,
+        //                                 callerName: callerName) { error in
+        //     if let error = error {
+        //         print("❌ reportNewIncomingCall error: \(error.localizedDescription)")
+        //         return
+        //     }
+        //     self.eventSink?(["event": EventChannel.onDidReceiveIncomingPush.rawValue,
+        //                      "payload": info as Any,
+        //                      "incoming_caller_name": callerName])
+        // }
+
+        if(app.applicationState == UIApplication.State.active) {
+            print("VOIP : App in foreground")
             self.eventSink?(["event": EventChannel.onDidReceiveIncomingPush.rawValue,
-                             "payload": info as Any,
-                             "incoming_caller_name": callerName])
+                             "payload": info as Any])
+        } else {
+            print("VOIP : App is in the background")
+            self.eventSink?(["event": EventChannel.onDidReceiveIncomingBackgroundPush.rawValue,
+                             "payload": info as Any])
         }
     }
 

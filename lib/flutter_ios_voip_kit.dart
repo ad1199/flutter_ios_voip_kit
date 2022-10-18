@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui';
 
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_ios_voip_kit/call_state_type.dart';
 import 'package:flutter_ios_voip_kit/channel_type.dart';
@@ -13,6 +15,16 @@ typedef IncomingPush = void Function(Map<String, dynamic> payload);
 typedef IncomingAction = void Function(String uuid, String callerId);
 typedef OnUpdatePushToken = void Function(String token);
 typedef OnAudioSessionStateChanged = void Function(bool active);
+
+void _fivkCallbackDispatcher() {
+  MethodChannel _backgroundChannel =
+      MethodChannel(ChannelType.backgroundMethod.name);
+  WidgetsFlutterBinding.ensureInitialized();
+
+  _backgroundChannel.setMethodCallHandler((call) async {
+    print("[VoIP kit]: Callback dispatcher working ... " + call.toString());
+  });
+}
 
 class FlutterIOSVoIPKit {
   static FlutterIOSVoIPKit get instance => _getInstance();
@@ -55,6 +67,13 @@ class FlutterIOSVoIPKit {
     print('🎈 dispose');
 
     await _eventSubscription?.cancel();
+  }
+
+  Future<void> initialize() async {
+    final CallbackHandle? callback =
+        PluginUtilities.getCallbackHandle(_fivkCallbackDispatcher);
+    await _channel
+        .invokeMethod('initializeService', <dynamic>[callback!.toRawHandle()]);
   }
 
   /// method channel
@@ -188,6 +207,29 @@ class FlutterIOSVoIPKit {
       'callerId': callerId,
       'callerName': callerName,
     });
+  }
+
+  Future<void> setOnBackgroundIncomingPush(
+      Function(Map<String, dynamic>) callback) async {
+    int? callbackHandler =
+        PluginUtilities.getCallbackHandle(callback)?.toRawHandle();
+
+    if (callbackHandler == null) {
+      print('[VoIP kit]: ERROR: Failed to get the callback id');
+    } else {
+      print(
+          '[VoIP kit] : Got the call handler : ' + callbackHandler.toString());
+    }
+
+    var args = callbackHandler;
+    try {
+      dynamic success =
+          await _channel.invokeMethod('setOnBackgroundIncomingPush', args);
+      print('[VoIP kit]: Background incoming push set. ' + success.toString());
+    } catch (e) {
+      String message = e.toString();
+      print('[VoIp kit]: setOnBackgroundIncomingPush $message');
+    }
   }
 
   /// event channel

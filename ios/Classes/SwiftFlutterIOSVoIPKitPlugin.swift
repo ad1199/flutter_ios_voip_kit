@@ -3,14 +3,33 @@ import UIKit
 import UserNotifications
 
 public class SwiftFlutterIOSVoIPKitPlugin: NSObject {
+
+    let _headlessRunner: FlutterEngine;
+    static let backgroundIsolateRun: Bool = false;
+    static var registerPlugins: FlutterPluginRegistrantCallback? = nil;
+    let _registrar: FlutterPluginRegistrar;
+    let _bgMethodChannel: FlutterMethodChannel;
+
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: FlutterPluginChannelType.method.name,  binaryMessenger: registrar.messenger())
-        let plugin = SwiftFlutterIOSVoIPKitPlugin(messenger: registrar.messenger())
+        let plugin = SwiftFlutterIOSVoIPKitPlugin(messenger: registrar.messenger(), registrar: registrar)
         registrar.addMethodCallDelegate(plugin, channel: channel)
     }
 
-    init(messenger: FlutterBinaryMessenger) {
-        self.voIPCenter = VoIPCenter(eventChannel: FlutterEventChannel(name: FlutterPluginChannelType.event.name, binaryMessenger: messenger))
+    public static func setPluginRegistrantCallback(callback: @escaping FlutterPluginRegistrantCallback) {
+        registerPlugins = callback;
+    }
+
+    init(messenger: FlutterBinaryMessenger, registrar: FlutterPluginRegistrar) {
+
+        _registrar = registrar;
+        _headlessRunner = FlutterEngine(name: "FIVKIsolate", project: nil, allowHeadlessExecution: true);
+        _bgMethodChannel = FlutterMethodChannel(name: "\(FlutterPluginChannelType.method.name)/background", binaryMessenger: _headlessRunner);
+
+        self.voIPCenter = VoIPCenter(
+            bgMethodChannel: _bgMethodChannel,
+            eventChannel: FlutterEventChannel(name: FlutterPluginChannelType.event.name, binaryMessenger: messenger)
+            )
         super.init()
         self.notificationCenter.delegate = self
     }
@@ -134,6 +153,39 @@ public class SwiftFlutterIOSVoIPKitPlugin: NSObject {
             result(nil)
         }
     }
+
+    private func setOnBackgroundIncomingPush(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        let defaults = UserDefaults.standard
+        let callbackHandle = call.arguments as? Int;
+        print("[VoIP kit]: Got the callback handle : \(callbackHandle!)")
+
+        defaults.setInteger(callbackHandle, forKey: "voip_on_background_incoming_push_handle")
+        result(true)
+    }
+
+    private func startBackgroundService(handle: Int) {
+        let info: FlutterCallbackInformation = FlutterCallbackInformation(lookupCallbackInformation: handle)
+        if(info == nil) {
+            // throw exception
+            print("[VoIP kit]: Cannot get the callback information");
+        } else {
+
+            let entrypoint: String = info.callbackName
+            let uri: String = info.callbackLibraryPath
+            _headlessRunner.run(withEntrypoint: entrypoint, libraryURI: uri )
+
+            assert(registerPlugins != nil, "[VoIP kit]: registerPlugins callback not set.");
+
+            if(!backgroundIsolateRun) {
+                registerPlugins(_headlessRunner)
+            }
+
+            _registrar.addMethodCallDelegate(self, channel: _bgMethodChannel)
+            backgroundIsolateRun = true;
+
+        }
+        
+    }
 }
 
 extension SwiftFlutterIOSVoIPKitPlugin: UNUserNotificationCenterDelegate {
@@ -159,6 +211,8 @@ extension SwiftFlutterIOSVoIPKitPlugin: FlutterPlugin {
         case requestAuthLocalNotification
         case getLocalNotificationsSettings
         case testIncomingCall
+        case setOnBackgroundIncomingPush
+        case initializeService
     }
 
     // MARK: - FlutterPlugin（method channel）
@@ -189,6 +243,11 @@ extension SwiftFlutterIOSVoIPKitPlugin: FlutterPlugin {
                 self.getLocalNotificationsSettings(call, result: result)
             case .testIncomingCall:
                 self.testIncomingCall(call, result: result)
+            case .setOnBackgroundIncomingPush:
+                self.setOnBackgroundIncomingPush(call, result: result)
+            case .initializeService:
+                self.startBackgroundService(handle: call.arguments)
+                result(true)
         }
     }
 }
