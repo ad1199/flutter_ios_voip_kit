@@ -3,14 +3,42 @@ import UIKit
 import UserNotifications
 
 public class SwiftFlutterIOSVoIPKitPlugin: NSObject {
+
+    private static var flutterPluginRegistrantCallback: FlutterPluginRegistrantCallback?
+
+    private var _registrar: FlutterPluginRegistrar
+    public static var dispatcherInitialized: Bool = false
+    private static var backgroundIsolateRun: Bool = false
+    
+    private var _flutterEngine: FlutterEngine
+
+    private var _backgroundMethodChannel: FlutterMethodChannel
+
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: FlutterPluginChannelType.method.name,  binaryMessenger: registrar.messenger())
-        let plugin = SwiftFlutterIOSVoIPKitPlugin(messenger: registrar.messenger())
+        let plugin = SwiftFlutterIOSVoIPKitPlugin(messenger: registrar.messenger(), registrar: registrar)
         registrar.addMethodCallDelegate(plugin, channel: channel)
+        registrar.addApplicationDelegate(plugin)
     }
 
-    init(messenger: FlutterBinaryMessenger) {
-        self.voIPCenter = VoIPCenter(eventChannel: FlutterEventChannel(name: FlutterPluginChannelType.event.name, binaryMessenger: messenger))
+    init(messenger: FlutterBinaryMessenger, registrar: FlutterPluginRegistrar) {
+
+        _flutterEngine = FlutterEngine(
+            name: "FIVKIsolate",
+            project: nil,
+            allowHeadlessExecution: true
+        )
+
+        _backgroundMethodChannel = FlutterMethodChannel(
+            name: FlutterPluginChannelType.backgroundMethod.name,
+            binaryMessenger: _flutterEngine.binaryMessenger
+        )
+
+        self.voIPCenter = VoIPCenter(
+            bgMethodChannel: _backgroundMethodChannel,
+            eventChannel: FlutterEventChannel(name: FlutterPluginChannelType.event.name, binaryMessenger: messenger
+            ))
+        self._registrar = registrar;
         super.init()
         self.notificationCenter.delegate = self
     }
@@ -134,6 +162,54 @@ public class SwiftFlutterIOSVoIPKitPlugin: NSObject {
             result(nil)
         }
     }
+
+    public func getCallbackHandle() -> Int64 {
+        let userDefaults = UserDefaults.standard;
+        let handle = userDefaults.integer(forKey: "fivk_callback_handle")
+        return handle;
+    }
+
+    private func setCallbackHandle(_ handle: Int64) {
+        let userDefaults = UserDefaults.standard;
+        userDefaults.setInteger(handle, forKey: "fivk_callback_handle");
+    }
+
+    public func startBackgroundService(_ handle: Int64) {
+        print("[fivk]: callback handle received \(handle)")
+
+        let info: FlutterCallbackInformation? = FlutterCallbackCache.lookupCallbackInformation(handle)
+        assert(info != nil, "[fivk] ERROR: failed to find the callback");
+
+        let entrypoint: String = info!.callbackName;
+        let uri: String =  info!.callbackLibraryPath;
+
+        print("[fivk]: callback found : \(entrypoint) with uri: \(uri)");
+
+
+        _flutterEngine.run(withEntrypoint: entrypoint, libraryURI: uri)
+        print("[fivk]: flutter engine is running...");
+
+        if(!SwiftFlutterIOSVoIPKitPlugin.backgroundIsolateRun) {
+            SwiftFlutterIOSVoIPKitPlugin.flutterPluginRegistrantCallback?(_flutterEngine)
+            print("[fivk]: flutter engine is registered...");
+        }
+
+        _backgroundMethodChannel.setMethodCallHandler{(call, result) in 
+            print("[fivk]: method handler called")
+            switch call.method {
+                case "dispatcherInitialized":
+                    result(true)
+                    print("[fivk]: Displatcher initialized")
+                default:
+                    print("[fivk]: background method channel called")
+            }
+        }
+
+        // _registrar.addMethodCallDelegate(self, channel: backgroundMethodChannel);
+
+        SwiftFlutterIOSVoIPKitPlugin.backgroundIsolateRun = true;
+
+    }
 }
 
 extension SwiftFlutterIOSVoIPKitPlugin: UNUserNotificationCenterDelegate {
@@ -159,6 +235,14 @@ extension SwiftFlutterIOSVoIPKitPlugin: FlutterPlugin {
         case requestAuthLocalNotification
         case getLocalNotificationsSettings
         case testIncomingCall
+        
+        case initialize
+        case dispatcherInitialized
+    }
+
+    @objc
+    public static func setPluginRegistrantCallback(_ callback: @escaping FlutterPluginRegistrantCallback) {
+        flutterPluginRegistrantCallback = callback
     }
 
     // MARK: - FlutterPlugin（method channel）
@@ -189,6 +273,17 @@ extension SwiftFlutterIOSVoIPKitPlugin: FlutterPlugin {
                 self.getLocalNotificationsSettings(call, result: result)
             case .testIncomingCall:
                 self.testIncomingCall(call, result: result)
+            case .initialize:
+                print("[fivk]: initialize calling...")
+                let args = call.arguments as! [Any]
+                let callbackHandle = args[0] as! Int64
+                self.setCallbackHandle(callbackHandle)
+                self.startBackgroundService(callbackHandle)
+                result(true)
+            case .dispatcherInitialized:
+                print("[fivk]: Dispatcher initialized")
+                SwiftFlutterIOSVoIPKitPlugin.dispatcherInitialized = true
+                result(true)
         }
     }
 }

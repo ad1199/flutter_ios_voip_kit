@@ -12,4 +12,8 @@
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
   [SwiftFlutterIOSVoIPKitPlugin registerWithRegistrar:registrar];
 }
+
++ (void)setPluginRegistrantCallback:(FlutterPluginRegistrantCallback)callback {
+  [SwiftFlutterIOSVoIPKitPlugin setPluginRegistrantCallback:callback];
+}
 @end

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui';
 
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_ios_voip_kit/call_state_type.dart';
 import 'package:flutter_ios_voip_kit/channel_type.dart';
@@ -13,6 +15,19 @@ typedef IncomingPush = void Function(Map<String, dynamic> payload);
 typedef IncomingAction = void Function(String uuid, String callerId);
 typedef OnUpdatePushToken = void Function(String token);
 typedef OnAudioSessionStateChanged = void Function(bool active);
+
+Future<void> fivkCallDispatcher() async {
+  MethodChannel _backgroundChannel =
+      MethodChannel(ChannelType.backgroundMethod.name);
+  WidgetsFlutterBinding.ensureInitialized();
+
+  _backgroundChannel.setMethodCallHandler((call) async {
+    print('method handler called');
+    print(call);
+  });
+
+  _backgroundChannel.invokeMethod("dispatcherInitialized");
+}
 
 class FlutterIOSVoIPKit {
   static FlutterIOSVoIPKit get instance => _getInstance();
@@ -55,6 +70,14 @@ class FlutterIOSVoIPKit {
     print('🎈 dispose');
 
     await _eventSubscription?.cancel();
+  }
+
+  Future<void> initialize() async {
+    final CallbackHandle? callback =
+        PluginUtilities.getCallbackHandle(fivkCallDispatcher);
+    print('[fivk]: initializing through channel');
+    await _channel
+        .invokeMethod('initialize', <dynamic>[callback!.toRawHandle()]);
   }
 
   /// method channel

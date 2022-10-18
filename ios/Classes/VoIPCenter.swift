@@ -22,6 +22,7 @@ class VoIPCenter: NSObject {
     // MARK: - event channel
 
     private let eventChannel: FlutterEventChannel
+    private let bgMethodChannel: FlutterMethodChannel
     private var eventSink: FlutterEventSink?
 
     private enum EventChannel: String {
@@ -63,7 +64,8 @@ class VoIPCenter: NSObject {
     fileprivate let ioBufferDuration: TimeInterval
     fileprivate let audioSampleRate: Double
 
-    init(eventChannel: FlutterEventChannel) {
+    init( bgMethodChannel: FlutterMethodChannel, eventChannel: FlutterEventChannel) {
+        self.bgMethodChannel = bgMethodChannel
         self.eventChannel = eventChannel
         self.pushRegistry = PKPushRegistry(queue: .main)
         self.pushRegistry.desiredPushTypes = [.voIP]
@@ -126,6 +128,7 @@ extension VoIPCenter: PKPushRegistryDelegate {
 
         let info = self.parse(payload: payload)
         let callerName = info?["incoming_caller_name"] as! String
+        self.bgMethodChannel.invokeMethod("testMethod", arguments: [])
         self.callKitCenter.incomingCall(uuidString: info?["uuid"] as! String,
                                         callerId: info?["incoming_caller_id"] as! String,
                                         callerName: callerName) { error in
