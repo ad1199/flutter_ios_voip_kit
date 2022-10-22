@@ -23,6 +23,7 @@ class VoIPCenter: NSObject {
 
     private let bgMethodChannel: FlutterMethodChannel
     private let eventChannel: FlutterEventChannel
+    private let bgMethodChannel: FlutterMethodChannel
     private var eventSink: FlutterEventSink?
 
     private enum EventChannel: String {
@@ -65,7 +66,11 @@ class VoIPCenter: NSObject {
     fileprivate let ioBufferDuration: TimeInterval
     fileprivate let audioSampleRate: Double
 
+<<<<<<< HEAD
     init(bgMethodChannel: FlutterMethodChannel, eventChannel: FlutterEventChannel) {
+=======
+    init( bgMethodChannel: FlutterMethodChannel, eventChannel: FlutterEventChannel) {
+>>>>>>> background
         self.bgMethodChannel = bgMethodChannel
         self.eventChannel = eventChannel
         self.pushRegistry = PKPushRegistry(queue: .main)
@@ -148,6 +153,7 @@ extension VoIPCenter: PKPushRegistryDelegate {
 
         let app = UIApplication.shared;
         let info = self.parse(payload: payload)
+<<<<<<< HEAD
         //let callerName = info?["incoming_caller_name"] as! String
         // self.callKitCenter.incomingCall(uuidString: info?["uuid"] as! String,
         //                                 callerId: info?["incoming_caller_id"] as! String,
@@ -163,6 +169,17 @@ extension VoIPCenter: PKPushRegistryDelegate {
 
         if(app.applicationState == UIApplication.State.active) {
             print("VOIP : App in foreground")
+=======
+        let callerName = info?["incoming_caller_name"] as! String
+        self.bgMethodChannel.invokeMethod("testMethod", arguments: [])
+        self.callKitCenter.incomingCall(uuidString: info?["uuid"] as! String,
+                                        callerId: info?["incoming_caller_id"] as! String,
+                                        callerName: callerName) { error in
+            if let error = error {
+                print("❌ reportNewIncomingCall error: \(error.localizedDescription)")
+                return
+            }
+>>>>>>> background
             self.eventSink?(["event": EventChannel.onDidReceiveIncomingPush.rawValue,
                              "payload": info as Any])
         } else {

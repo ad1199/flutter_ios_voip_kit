@@ -11,19 +11,39 @@ import 'notifications_settings.dart';
 
 final MethodChannel _channel = MethodChannel(ChannelType.method.name);
 
-typedef IncomingPush = void Function(Map<String, dynamic> payload);
+typedef IncomingPush = Future<void> Function(String, Map?);
 typedef IncomingAction = void Function(String uuid, String callerId);
 typedef OnUpdatePushToken = void Function(String token);
 typedef OnAudioSessionStateChanged = void Function(bool active);
 
+<<<<<<< HEAD
 void _fivkCallbackDispatcher() {
+=======
+Future<void> fivkCallDispatcher() async {
+>>>>>>> background
   MethodChannel _backgroundChannel =
       MethodChannel(ChannelType.backgroundMethod.name);
   WidgetsFlutterBinding.ensureInitialized();
 
   _backgroundChannel.setMethodCallHandler((call) async {
+<<<<<<< HEAD
     print("[VoIP kit]: Callback dispatcher working ... " + call.toString());
   });
+=======
+    print("[fivk]: setMethodCallHandler invoked in dispatcher");
+    final List<dynamic> args = call.arguments;
+    final Function? callback = PluginUtilities.getCallbackFromHandle(
+        CallbackHandle.fromRawHandle(args[0]));
+    assert(callback != null);
+
+    String event = args[1];
+    Map? data;
+    if (args.length > 2) data = args[2];
+    await callback!(event, data);
+  });
+
+  _backgroundChannel.invokeMethod("dispatcherInitialized");
+>>>>>>> background
 }
 
 class FlutterIOSVoIPKit {
@@ -52,14 +72,7 @@ class FlutterIOSVoIPKit {
   /// [onDidReceiveIncomingPush] is not called when the app is not running, because app is not yet running when didReceiveIncomingPushWith is called.
   IncomingPush? onDidReceiveIncomingPush;
 
-  /// [onDidAcceptIncomingCall] and [onDidRejectIncomingCall] can be called even if the app is not running.
-  /// This is because the app is already running when the incoming call screen is displayed for CallKit.
-  /// If not called, make sure the app is calling [onDidAcceptIncomingCall] and [onDidRejectIncomingCall] in the Dart class(ex: main.dart) that is called immediately after the app is launched.
-  IncomingAction? onDidAcceptIncomingCall;
-  IncomingAction? onDidRejectIncomingCall;
   OnUpdatePushToken? onDidUpdatePushToken;
-
-  OnAudioSessionStateChanged? onAudioSessionStateChanged;
 
   StreamSubscription<dynamic>? _eventSubscription;
 
@@ -71,12 +84,28 @@ class FlutterIOSVoIPKit {
 
   Future<void> initialize() async {
     final CallbackHandle? callback =
+<<<<<<< HEAD
         PluginUtilities.getCallbackHandle(_fivkCallbackDispatcher);
     await _channel
         .invokeMethod('initializeService', <dynamic>[callback!.toRawHandle()]);
+=======
+        PluginUtilities.getCallbackHandle(fivkCallDispatcher);
+    print('[fivk]: initializing through channel');
+    await _channel
+        .invokeMethod('initialize', <dynamic>[callback!.toRawHandle()]);
+>>>>>>> background
   }
 
   /// method channel
+
+  Future<void> setBackgroundCallback(
+      Future<void> Function(String, Map?) backgroundCallback) async {
+    final CallbackHandle? callback =
+        PluginUtilities.getCallbackHandle(backgroundCallback);
+    print('[fivk]: set on background callback');
+    await _channel.invokeMethod(
+        'setBackgroundCallback', <dynamic>[callback!.toRawHandle()]);
+  }
 
   Future<String?> getVoIPToken() async {
     print('🎈 getVoIPToken');
@@ -246,33 +275,11 @@ class FlutterIOSVoIPKit {
           return;
         }
 
-        onDidReceiveIncomingPush!(
-          Map<String, dynamic>.from(map['payload'] as Map),
-        );
-        break;
-      case 'onDidAcceptIncomingCall':
-        print('🎈 onDidAcceptIncomingCall($onDidAcceptIncomingCall): $map');
-
-        if (onDidAcceptIncomingCall == null) {
-          return;
-        }
-
-        onDidAcceptIncomingCall!(
-          map['uuid'],
-          map['incoming_caller_id'],
-        );
-        break;
-      case 'onDidRejectIncomingCall':
-        print('🎈 onDidRejectIncomingCall($onDidRejectIncomingCall): $map');
-
-        if (onDidRejectIncomingCall == null) {
-          return;
-        }
-
-        onDidRejectIncomingCall!(
-          map['uuid'],
-          map['incoming_caller_id'],
-        );
+        Map payload = map['payload'] as Map;
+        String e = payload['event'];
+        Map? data;
+        if (payload['data'] != null) data = payload['data'] as Map;
+        onDidReceiveIncomingPush!(e, data);
         break;
 
       case 'onDidUpdatePushToken':
@@ -284,16 +291,6 @@ class FlutterIOSVoIPKit {
         }
 
         onDidUpdatePushToken!(token);
-        break;
-      case 'onDidActivateAudioSession':
-        print('🎈 onDidActivateAudioSession');
-        if (onAudioSessionStateChanged != null)
-          onAudioSessionStateChanged!(true);
-        break;
-      case 'onDidDeactivateAudioSession':
-        print('🎈 onDidDeactivateAudioSession');
-        if (onAudioSessionStateChanged != null)
-          onAudioSessionStateChanged!(false);
         break;
     }
   }
