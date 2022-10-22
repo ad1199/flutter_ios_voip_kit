@@ -140,4 +140,8 @@ class CallKitCenter: NSObject {
 
         self.provider?.reportCall(with: self.uuid, endedAt: nil, reason: reason)
     }
+
+    func isCalling() -> Bool {
+        return self.uuidString != nil
+    }
 }
