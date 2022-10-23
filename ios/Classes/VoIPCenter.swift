@@ -21,7 +21,6 @@ class VoIPCenter: NSObject {
 
     // MARK: - event channel
 
-    private let bgMethodChannel: FlutterMethodChannel
     private let eventChannel: FlutterEventChannel
     private let bgMethodChannel: FlutterMethodChannel
     private var eventSink: FlutterEventSink?
@@ -147,7 +146,7 @@ extension VoIPCenter: PKPushRegistryDelegate {
     public func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType) {
         print("🎈 VoIP didReceiveIncomingPushWith: \(payload.dictionaryPayload)")
 
-        let app = UIApplication.shared;
+        // let app = UIApplication.shared;
         let info = self.parse(payload: payload)
         let callerName = info?["incoming_caller_name"] as! String
         self.bgMethodChannel.invokeMethod("testMethod", arguments: [])
@@ -160,11 +159,7 @@ extension VoIPCenter: PKPushRegistryDelegate {
             }
             self.eventSink?(["event": EventChannel.onDidReceiveIncomingPush.rawValue,
                              "payload": info as Any])
-        } else {
-            print("VOIP : App is in the background")
-            self.eventSink?(["event": EventChannel.onDidReceiveIncomingBackgroundPush.rawValue,
-                             "payload": info as Any])
-        }
+        } 
     }
 
     private func parse(payload: PKPushPayload) -> [String: Any]? {

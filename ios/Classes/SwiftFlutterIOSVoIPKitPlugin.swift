@@ -316,32 +316,8 @@ public class SwiftFlutterIOSVoIPKitPlugin: NSObject {
         let callbackHandle = call.arguments as? Int;
         print("[VoIP kit]: Got the callback handle : \(callbackHandle!)")
 
-        defaults.setInteger(callbackHandle, forKey: "voip_on_background_incoming_push_handle")
+        defaults.setInteger(callbackHandle!, forKey: "voip_on_background_incoming_push_handle")
         result(true)
-    }
-
-    private func startBackgroundService(handle: Int) {
-        let info: FlutterCallbackInformation = FlutterCallbackInformation(lookupCallbackInformation: handle)
-        if(info == nil) {
-            // throw exception
-            print("[VoIP kit]: Cannot get the callback information");
-        } else {
-
-            let entrypoint: String = info.callbackName
-            let uri: String = info.callbackLibraryPath
-            _headlessRunner.run(withEntrypoint: entrypoint, libraryURI: uri )
-
-            assert(registerPlugins != nil, "[VoIP kit]: registerPlugins callback not set.");
-
-            if(!backgroundIsolateRun) {
-                registerPlugins(_headlessRunner)
-            }
-
-            _registrar.addMethodCallDelegate(self, channel: _bgMethodChannel)
-            backgroundIsolateRun = true;
-
-        }
-        
     }
 }
 
@@ -494,7 +470,7 @@ extension SwiftFlutterIOSVoIPKitPlugin: PKPushRegistryDelegate {
             }
 
             // Close incoming callkit ui if the invitation is expired
-            var dateFormatter = DateFormatter()
+            let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'"
             dateFormatter.timeZone = TimeZone(abbreviation: "UTC") // set timezone to utc
             let calledUtcDate = dateFormatter.date(from: info!["called_at"] as! String)
