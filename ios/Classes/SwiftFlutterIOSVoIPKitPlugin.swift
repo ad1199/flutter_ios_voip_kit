@@ -316,7 +316,7 @@ public class SwiftFlutterIOSVoIPKitPlugin: NSObject {
         let callbackHandle = call.arguments as? Int;
         print("[VoIP kit]: Got the callback handle : \(callbackHandle!)")
 
-        defaults.setInteger(callbackHandle!, forKey: "voip_on_background_incoming_push_handle")
+        defaults.set(callbackHandle!, forKey: "voip_on_background_incoming_push_handle")
         result(true)
     }
 }

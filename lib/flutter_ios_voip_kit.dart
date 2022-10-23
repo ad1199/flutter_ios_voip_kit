@@ -16,20 +16,12 @@ typedef IncomingAction = void Function(String uuid, String callerId);
 typedef OnUpdatePushToken = void Function(String token);
 typedef OnAudioSessionStateChanged = void Function(bool active);
 
-<<<<<<< HEAD
-void _fivkCallbackDispatcher() {
-=======
 Future<void> fivkCallDispatcher() async {
->>>>>>> background
   MethodChannel _backgroundChannel =
       MethodChannel(ChannelType.backgroundMethod.name);
   WidgetsFlutterBinding.ensureInitialized();
 
   _backgroundChannel.setMethodCallHandler((call) async {
-<<<<<<< HEAD
-    print("[VoIP kit]: Callback dispatcher working ... " + call.toString());
-  });
-=======
     print("[fivk]: setMethodCallHandler invoked in dispatcher");
     final List<dynamic> args = call.arguments;
     final Function? callback = PluginUtilities.getCallbackFromHandle(
@@ -43,7 +35,6 @@ Future<void> fivkCallDispatcher() async {
   });
 
   _backgroundChannel.invokeMethod("dispatcherInitialized");
->>>>>>> background
 }
 
 class FlutterIOSVoIPKit {
@@ -84,16 +75,10 @@ class FlutterIOSVoIPKit {
 
   Future<void> initialize() async {
     final CallbackHandle? callback =
-<<<<<<< HEAD
-        PluginUtilities.getCallbackHandle(_fivkCallbackDispatcher);
-    await _channel
-        .invokeMethod('initializeService', <dynamic>[callback!.toRawHandle()]);
-=======
         PluginUtilities.getCallbackHandle(fivkCallDispatcher);
     print('[fivk]: initializing through channel');
     await _channel
         .invokeMethod('initialize', <dynamic>[callback!.toRawHandle()]);
->>>>>>> background
   }
 
   /// method channel
