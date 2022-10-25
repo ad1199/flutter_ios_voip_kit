@@ -76,7 +76,6 @@ class FlutterIOSVoIPKit {
   Future<void> initialize() async {
     final CallbackHandle? callback =
         PluginUtilities.getCallbackHandle(fivkCallDispatcher);
-    print('[fivk]: initializing through channel');
     await _channel
         .invokeMethod('initialize', <dynamic>[callback!.toRawHandle()]);
   }

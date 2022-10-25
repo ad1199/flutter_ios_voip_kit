@@ -36,7 +36,9 @@ public class SwiftFlutterIOSVoIPKitPlugin: NSObject {
 
     var token: String? {
         if let didUpdateDeviceToken = UserDefaults.standard.data(forKey: didUpdateTokenKey) {
-            let token = String(deviceToken: didUpdateDeviceToken)
+            print(didUpdateDeviceToken)
+            let token = didUpdateDeviceToken.map { String(format: "%02.2hhx", $0) }.joined()
+            //let token = String(decoding: didUpdateDeviceToken, as: UTF8.self)
             print("🎈 VoIP didUpdateDeviceToken: \(token)")
             return token
         }
@@ -45,7 +47,10 @@ public class SwiftFlutterIOSVoIPKitPlugin: NSObject {
             return nil
         }
 
-        let token = String(deviceToken: cacheDeviceToken)
+        print(cacheDeviceToken)
+
+        let token = cacheDeviceToken.map { String(format: "%02.2hhx", $0) }.joined()
+        //let token = String(decoding: cacheDeviceToken, as: UTF8.self)
         print("🎈 VoIP cacheDeviceToken: \(token)")
         return token
     }
@@ -67,7 +72,6 @@ public class SwiftFlutterIOSVoIPKitPlugin: NSObject {
         self.app = UIApplication.shared;
         self._registrar = registrar;
         self.callKitCenter = CallKitCenter()
-        print("[fivk]: Callkitcenter initialized")
         self.pushRegistry = PKPushRegistry(queue: .main)
         self.pushRegistry.desiredPushTypes = [.voIP]
 
@@ -402,10 +406,11 @@ extension SwiftFlutterIOSVoIPKitPlugin: PKPushRegistryDelegate {
 
     public func pushRegistry(_ registry: PKPushRegistry, didUpdate pushCredentials: PKPushCredentials, for type: PKPushType) {
         print("🎈 VoIP didUpdate pushCredentials")
+        print(token)
         UserDefaults.standard.set(pushCredentials.token, forKey: didUpdateTokenKey)
         
-        // self.eventSink?(["event": EventChannel.onDidUpdatePushToken.rawValue,
-        //                  "token": pushCredentials.token.hexString])
+        self.eventSink?(["event": EventChannel.onDidUpdatePushToken.rawValue,
+                         "token": pushCredentials.token.hexString])
     }
 
     // NOTE: iOS11 or more support
@@ -413,6 +418,7 @@ extension SwiftFlutterIOSVoIPKitPlugin: PKPushRegistryDelegate {
     public func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType, completion: @escaping () -> Void) {
         print("🎈 VoIP didReceiveIncomingPushWith completion: \(payload.dictionaryPayload)")
 
+        print("[fivk]: Handle Push Event")
         handlePushEvent(payload)
 
         completion()
@@ -424,19 +430,7 @@ extension SwiftFlutterIOSVoIPKitPlugin: PKPushRegistryDelegate {
     public func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType) {
         print("🎈 VoIP didReceiveIncomingPushWith: \(payload.dictionaryPayload)")
 
-        let info = self.parse(payload: payload)
-        let callerName = info!["incoming_caller_name"] as! String
-        self.callKitCenter.incomingCall(uuidString: info!["uuid"] as! String,
-                                        callerId: info!["incoming_caller_id"] as! String,
-                                        callerName: callerName) { error in
-            if let error = error {
-                print("❌ reportNewIncomingCall error: \(error.localizedDescription)")
-                return
-            }
-            // self.eventSink?(["event": EventChannel.onDidReceiveIncomingPush.rawValue,
-            //                  "payload": info as Any,
-            //                  "incoming_caller_name": callerName])
-        }
+       handlePushEvent(payload)
     }
 
     private func parse(payload: PKPushPayload) -> [String: Any]? {
