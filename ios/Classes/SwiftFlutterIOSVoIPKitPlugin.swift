@@ -36,7 +36,6 @@ public class SwiftFlutterIOSVoIPKitPlugin: NSObject {
 
     var token: String? {
         if let didUpdateDeviceToken = UserDefaults.standard.data(forKey: didUpdateTokenKey) {
-            print(didUpdateDeviceToken)
             let token = didUpdateDeviceToken.map { String(format: "%02.2hhx", $0) }.joined()
             //let token = String(decoding: didUpdateDeviceToken, as: UTF8.self)
             print("🎈 VoIP didUpdateDeviceToken: \(token)")
@@ -46,8 +45,6 @@ public class SwiftFlutterIOSVoIPKitPlugin: NSObject {
         guard let cacheDeviceToken = self.pushRegistry.pushToken(for: .voIP) else {
             return nil
         }
-
-        print(cacheDeviceToken)
 
         let token = cacheDeviceToken.map { String(format: "%02.2hhx", $0) }.joined()
         //let token = String(decoding: cacheDeviceToken, as: UTF8.self)
@@ -225,7 +222,6 @@ public class SwiftFlutterIOSVoIPKitPlugin: NSObject {
         let handle = args[0] as! Int64
         let userDefaults = UserDefaults.standard
         userDefaults.set(handle, forKey: "fivk_callback_handle");
-        print("[fivk]: Set background callback done")
     }
 
     private func isAppActive() -> Bool {
@@ -256,15 +252,12 @@ public class SwiftFlutterIOSVoIPKitPlugin: NSObject {
         }
 
         let handle = self.getDispatcherHandle()
-        print("[fivk]: callback handle received \(handle)")
 
         let info: FlutterCallbackInformation? = FlutterCallbackCache.lookupCallbackInformation(handle)
         assert(info != nil, "[fivk] ERROR: failed to find the callback");
 
         let entrypoint: String = info!.callbackName;
         let uri: String =  info!.callbackLibraryPath;
-
-        print("[fivk]: callback found : \(entrypoint) with uri: \(uri)");
 
         flutterEngine = FlutterEngine(
             name: "FIVKIsolate",
@@ -273,11 +266,8 @@ public class SwiftFlutterIOSVoIPKitPlugin: NSObject {
         )
 
         flutterEngine!.run(withEntrypoint: entrypoint, libraryURI: uri)
-        print("[fivk]: flutter engine is running...");
 
-        print("[fivk]: Calling plugin regstrant callback")
         SwiftFlutterIOSVoIPKitPlugin.flutterPluginRegistrantCallback?(flutterEngine!)
-        print("[fivk]: flutter engine is registered...");
 
         backgroundMethodChannel = FlutterMethodChannel(
             name: FlutterPluginChannelType.backgroundMethod.name,
@@ -285,15 +275,12 @@ public class SwiftFlutterIOSVoIPKitPlugin: NSObject {
         )
 
         backgroundMethodChannel!.setMethodCallHandler{(call, result) in 
-            print("[fivk]: background set method handler called")
             switch call.method {
                 case "dispatcherInitialized":
                     self.dispatcherInitialized = true
                     result(true)
-                    print("[fivk]: Dispatcher initialized")
                     completion(true)
                 default:
-                    print("[fivk]: Method not registered")
                     // cleanupFlutterResources()
                     result(true)
                     completion(true)
@@ -318,7 +305,6 @@ public class SwiftFlutterIOSVoIPKitPlugin: NSObject {
     private func setOnBackgroundIncomingPush(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         let defaults = UserDefaults.standard
         let callbackHandle = call.arguments as? Int;
-        print("[VoIP kit]: Got the callback handle : \(callbackHandle!)")
 
         defaults.set(callbackHandle!, forKey: "voip_on_background_incoming_push_handle")
         result(true)
@@ -393,7 +379,6 @@ extension SwiftFlutterIOSVoIPKitPlugin: FlutterPlugin {
                 //self.startBackgroundService()
                 result(true)
             case .setBackgroundCallback:
-                print("[fivk]: Set background callback")
                 self.setBackgroundCallback(call)
                 result(true)
         }
@@ -405,8 +390,6 @@ extension SwiftFlutterIOSVoIPKitPlugin: PKPushRegistryDelegate {
     // MARK: - PKPushRegistryDelegate
 
     public func pushRegistry(_ registry: PKPushRegistry, didUpdate pushCredentials: PKPushCredentials, for type: PKPushType) {
-        print("🎈 VoIP didUpdate pushCredentials")
-        print(token)
         UserDefaults.standard.set(pushCredentials.token, forKey: didUpdateTokenKey)
         
         self.eventSink?(["event": EventChannel.onDidUpdatePushToken.rawValue,
@@ -418,7 +401,6 @@ extension SwiftFlutterIOSVoIPKitPlugin: PKPushRegistryDelegate {
     public func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType, completion: @escaping () -> Void) {
         print("🎈 VoIP didReceiveIncomingPushWith completion: \(payload.dictionaryPayload)")
 
-        print("[fivk]: Handle Push Event")
         handlePushEvent(payload)
 
         completion()
@@ -473,8 +455,6 @@ extension SwiftFlutterIOSVoIPKitPlugin: PKPushRegistryDelegate {
             let difference = currentDate.timeIntervalSinceReferenceDate - calledUtcDate!.timeIntervalSinceReferenceDate
 
             let currentDateString = dateFormatter.string(from: currentDate)
-            print("[fivk]: Current date: \(currentDateString)")
-            print("[fivk]: Difference in called date: \(difference)")
 
             if(difference > 30) {
                 callEndedBySystem = true
@@ -505,14 +485,12 @@ extension SwiftFlutterIOSVoIPKitPlugin: PKPushRegistryDelegate {
         }
 
         if(self.isAppActive()) {
-            print("[fivk]: Application is active")
             self.eventSink?(["event": EventChannel.onDidReceiveIncomingPush.rawValue,
                              "payload": [
                                 "event": event,
                                 "data": info as Any
                              ]])
         } else {
-            print("[fivk]: Application is inactive")
             self.startBackgroundService() { result in
                 self.runBackgroundCallback(event: event, data: info!) { result in
                     if(event == "cancel") {
@@ -548,7 +526,6 @@ extension SwiftFlutterIOSVoIPKitPlugin: CXProviderDelegate {
         //                  "incoming_caller_id": self.callKitCenter.incomingCallerId as Any])
 
         callEndedBySystem = true;
-        print("[fivk]: Accept call action")
         if(self.isAppActive() ) {
             self.eventSink?(["event": EventChannel.onDidReceiveIncomingPush.rawValue,
                              "payload": [
@@ -566,7 +543,6 @@ extension SwiftFlutterIOSVoIPKitPlugin: CXProviderDelegate {
     }
 
     public func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
-        print("❎ VoIP CXEndCallAction")
         // if (self.callKitCenter.isCalleeBeforeAcceptIncomingCall) {
         //     self.eventSink?(["event": EventChannel.onDidRejectIncomingCall.rawValue,
         //                      "uuid": self.callKitCenter.uuidString as Any,
@@ -574,8 +550,6 @@ extension SwiftFlutterIOSVoIPKitPlugin: CXProviderDelegate {
         // }
         self.callKitCenter.disconnected(reason: .remoteEnded)
         action.fulfill()
-
-        print("[fivk]: End call action")
 
         if(callEndedBySystem) {
             return
